@@ -1,64 +1,42 @@
 import gradio as gr
-from huggingface_hub import InferenceClient
+from openai import OpenAI
+import os
 
-"""
-For more information on `huggingface_hub` Inference API support, please check the docs: https://huggingface.co/docs/huggingface_hub/v0.22.2/en/guides/inference
-"""
-client = InferenceClient("HuggingFaceH4/zephyr-7b-beta")
+client = OpenAI()
 
+title = 'Workout Generator'
 
-def respond(
-    message,
-    history: list[tuple[str, str]],
-    system_message,
-    max_tokens,
-    temperature,
-    top_p,
-):
-    messages = [{"role": "system", "content": system_message}]
-
-    for val in history:
-        if val[0]:
-            messages.append({"role": "user", "content": val[0]})
-        if val[1]:
-            messages.append({"role": "assistant", "content": val[1]})
-
-    messages.append({"role": "user", "content": message})
-
-    response = ""
-
-    for message in client.chat_completion(
-        messages,
-        max_tokens=max_tokens,
-        stream=True,
-        temperature=temperature,
-        top_p=top_p,
-    ):
-        token = message.choices[0].delta.content
-
-        response += token
-        yield response
+#Defines the behavior expected from the chatbot
+system_message = ('You are a virtual strength and conditioning coach that give the user workouts based'
+                  ' on their goal, available time and equipment. The workouts should contain a short warmup,'
+                  ' workout and no cooldown.'  
+                  'If the user ask about anything that is not relevant to their workout, lead them back on '
+                  'the topic of this workout.'
+                  'After the workout is complete you ask the user to give feedback'
+                  'on the workout. After feedback is received save the workout and response as a json. The file must have type of workout'
+                  'exercises, sets, reps and feedback as a minimum')
 
 
-"""
-For information on how to customize the ChatInterface, peruse the gradio docs: https://www.gradio.app/docs/chatinterface
-"""
-demo = gr.ChatInterface(
-    respond,
-    additional_inputs=[
-        gr.Textbox(value="You are a friendly Chatbot.", label="System message"),
-        gr.Slider(minimum=1, maximum=2048, value=512, step=1, label="Max new tokens"),
-        gr.Slider(minimum=0.1, maximum=4.0, value=0.7, step=0.1, label="Temperature"),
-        gr.Slider(
-            minimum=0.1,
-            maximum=1.0,
-            value=0.95,
-            step=0.05,
-            label="Top-p (nucleus sampling)",
-        ),
-    ],
-)
+def chatbot_response(message, history=[]):
 
+    history.append({"role": "system", "content": system_message })
+    history.append({"role": "user", "content": message})
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=history,
+        temperature=1,
+        stream=True
+    )
 
-if __name__ == "__main__":
-    demo.launch()
+    partial_message = ""
+    for chunk in response:
+        if chunk.choices[0].delta.content is not None:
+            partial_message = partial_message + chunk.choices[0].delta.content
+            yield partial_message
+    history.append({"role": "assistant", "content": partial_message})
+
+gr.ChatInterface(chatbot_response, type="messages",
+                 textbox=gr.Textbox(placeholder="Let me help you generate a workout", container=False),
+                 title=title,
+                 ).launch()
+
