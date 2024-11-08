@@ -3,7 +3,7 @@
 import asyncio
 import json
 import pandas as pd
-from datasets import Dataset
+from datasets import Dataset, load_dataset
 from huggingface_hub import HfApi
 
 api = HfApi()
@@ -16,22 +16,25 @@ def tool_call_to_workout_parse(message):
 
 #Pushes the completed workout to our huggingface dataset
 def save_to_hub(message):
-    print("Saving workout")
     dataset = update_dataset(message)
-    dataset.push_to_hub("KasparER/completed_workouts")
+    dataset.push_to_hub("KasparER/completed_workouts", commit_message="Updating workouts")
 
 #Loads our dataset from huggingface.
 def load_dataset_from_hub():
-    df = pd.read_csv("hf://datasets/KasparER/completed_workouts/completed_workouts.csv")
-    #df = load_dataset("KasparER/completed_workouts")
+    ds = load_dataset("KasparER/completed_workouts", split="train")
+    df = pd.DataFrame(ds)
     return df
 
 #Adds the new workout to our dataset, and transforms it into correct dataset format
 def update_dataset(message):
+    #only the csv
     dataset = load_dataset_from_hub()
-    #new_row = pd.DataFrame(tool_call_to_workout_parse(message))
+    #Parsing the message to correct format
     new_row = tool_call_to_workout_parse(message)
+    #Changing it to fit a panda
     dataset_data = pd.DataFrame([new_row])
-    updated_dataset = pd.concat([dataset, dataset_data], ignore_index=True, )
+    #adding it to the previous one
+    updated_dataset = pd.concat([dataset, dataset_data], ignore_index=True)
+    #formatting it into a dataset that can be pushed.
     updated_hf_dataset = Dataset.from_pandas(updated_dataset)
     return updated_hf_dataset
