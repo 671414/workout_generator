@@ -1,40 +1,39 @@
+import utils
 import gradio as gr
 from openai import OpenAI
 import os
+import chatbot_tools_and_messages
 
 api_key=os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=api_key)
 
 title = 'Workout Generator'
 
-#Defines the behavior expected from the chatbot
-system_message = ('You are a virtual strength and conditioning coach that give the user workouts based'
-                  ' on their goal, available time and equipment. The workouts should contain a short warmup,'
-                  ' workout and no cooldown.'  
-                  'If the user ask about anything that is not relevant to their workout, lead them back on '
-                  'the topic of this workout.'
-                  'After the workout is complete you ask the user to give feedback'
-                  'on the workout. After feedback is received save the workout and response as a json. The file must have type of workout'
-                  'exercises, sets, reps and feedback as a minimum')
-
-
-def chatbot_response(message, history=[]):
-
-    history.append({"role": "system", "content": system_message })
+async def chatbot_response(message, history=[]):
+    #Conversation history
+    history.append({"role": "system", "content": chatbot_tools_and_messages.system_message })
     history.append({"role": "user", "content": message})
+    history.append({"role": "assistant", "content": utils.read_previous_workouts()})
+
+    #Generate response
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=history,
         temperature=1,
-        stream=True
+        tools=chatbot_tools_and_messages.tools,
     )
 
-    partial_message = ""
-    for chunk in response:
-        if chunk.choices[0].delta.content is not None:
-            partial_message = partial_message + chunk.choices[0].delta.content
-            yield partial_message
-    history.append({"role": "assistant", "content": partial_message})
+    #Checks if a tool call has been done, in our case, saved to file
+    if response.choices[0].finish_reason == "tool_calls":
+        #updating the file
+        await utils.update_workout_csv_async(response)
+        return "Workout saved! Go get some rest, and feel free to use me for your next workout."
+
+    # If no function call, return the chatbot's generated message
+    workout_generator_reply = response.choices[0].message.content
+    history.append({"role": "assistant", "content": workout_generator_reply})
+    return workout_generator_reply
+
 
 gr.ChatInterface(chatbot_response, type="messages",
                  textbox=gr.Textbox(placeholder="Let me help you generate a workout", container=False),
