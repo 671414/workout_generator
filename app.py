@@ -3,7 +3,7 @@ import gradio as gr
 from openai import OpenAI
 import os
 import chatbot_tools_and_messages
-from utils import update_dataset
+from utils import update_dataset, save_to_hub
 
 api_key=os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=api_key)
@@ -14,7 +14,7 @@ async def chatbot_response(message, history=[]):
     #Conversation history
     history.append({"role": "system", "content": chatbot_tools_and_messages.system_message })
     history.append({"role": "user", "content": message})
-    history.append({"role": "assistant", "content": utils.load_dataset()})
+    history.append({"role": "assistant", "content": utils.load_dataset_from_hub().to_string()})
 
     #Generate response
     response = client.chat.completions.create(
@@ -27,7 +27,7 @@ async def chatbot_response(message, history=[]):
     #Checks if a tool call has been done, in our case, saved to file
     if response.choices[0].finish_reason == "tool_calls":
         #updating the file
-        await update_dataset(response)
+        save_to_hub(response)
         return "Workout saved! Go get some rest, and feel free to use me for your next workout."
 
     # If no function call, return the chatbot's generated message
