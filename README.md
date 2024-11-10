@@ -1,3 +1,8 @@
+This is a school project for DAT158 Advanced algorithms and Machine Learning.
+We have created a chatbot to generate strength and conditioning workouts based on ChatGPT-4o-mini. The project is hosted on Huggingface. The link to the chatbot is here https://huggingface.co/spaces/KasparER/workout_generator and you can find our dataset, which is being updated every time a workout is saved here: https://huggingface.co/datasets/KasparER/completed_workouts
+
+
+
 ---
 title: Workout Generator
 emoji: 💬
